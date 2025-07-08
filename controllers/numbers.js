@@ -1,24 +1,31 @@
 const Number = require("../models/numbers");
+const moment = require("moment-timezone");
+
 const getNumbers = async (req, res) => {
   try {
-    const now = new Date();
+    // Get current time in Asia/Yangon
+    const nowYangon = moment().tz("Asia/Yangon");
 
-    // Get current time as total minutes from midnight
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = nowYangon.hours() * 60 + nowYangon.minutes();
 
-    // Calculate today (midnight) and 10 days ago
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Today in Yangon (midnight)
+    const todayYangon = nowYangon.clone().startOf("day");
 
-    const tenDaysAgo = new Date(today);
-    tenDaysAgo.setDate(today.getDate() - 9);
+    // End of today (23:59:59 in Yangon)
+    const endOfTodayYangon = todayYangon.clone().endOf("day");
 
-    // Fetch all numbers from the last 10 days
+    // 10 days ago (inclusive of today)
+    const tenDaysAgoYangon = todayYangon.clone().subtract(9, "days");
+
+    // Convert to UTC for MongoDB query
     const numbers = await Number.find({
-      date: { $gte: tenDaysAgo, $lte: today },
+      date: {
+        $gte: tenDaysAgoYangon.toDate(),
+        $lte: endOfTodayYangon.toDate(),
+      },
     }).sort({ date: 1, timeSlot: 1 });
 
-    // Helper to convert "HH:mm" to total minutes
+    // Helper to convert timeSlot "HH:mm" to total minutes
     function timeSlotToMinutes(timeSlot) {
       const [hourStr, minStr] = timeSlot.split(":");
       const h = parseInt(hourStr, 10);
@@ -26,21 +33,16 @@ const getNumbers = async (req, res) => {
       return h * 60 + m;
     }
 
-    // Filter numbers for today and past days
+    // Filter numbers for past days and today's passed slots
     const filtered = numbers.filter((number) => {
-      const numberDate = new Date(number.date);
-      numberDate.setHours(0, 0, 0, 0);
-
-      if (numberDate.getTime() < today.getTime()) {
-        // Include all numbers for previous days
+      const numberDate = moment(number.date).tz("Asia/Yangon").startOf("day");
+      if (numberDate.isBefore(todayYangon)) {
         return true;
       } else {
-        // Include today's numbers only if timeSlot <= current time
         return timeSlotToMinutes(number.timeSlot) <= currentMinutes;
       }
     });
 
-    // Send the filtered list as a response
     res.json(filtered);
   } catch (error) {
     console.error("Error fetching numbers:", error);
@@ -52,17 +54,17 @@ const createNumber = async (req, res) => {
   try {
     const { timeSlot, number } = req.body;
 
-    const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
+    const nowYangon = moment().tz("Asia/Yangon");
+    const startOfDay = nowYangon.clone().startOf("day");
+    const endOfDay = nowYangon.clone().endOf("day");
 
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    // Check if a number already exists for the given timeSlot today
+    // Prevent duplicates for today and timeSlot
     const alreadyExists = await Number.findOne({
-      timeSlot: timeSlot,
-      date: { $gte: startOfDay, $lte: endOfDay },
+      timeSlot,
+      date: {
+        $gte: startOfDay.toDate(),
+        $lte: endOfDay.toDate(),
+      },
     });
 
     if (alreadyExists) {
@@ -71,12 +73,17 @@ const createNumber = async (req, res) => {
       });
     }
 
-    // Create and save the new number
-    const numberEntry = await Number.create({ timeSlot, number });
+    // Save with default date set to today in your schema
+    const numberEntry = await Number.create({
+      timeSlot,
+      number,
+      date: endOfDay.toDate(),
+    });
     res.status(201).json(numberEntry);
   } catch (error) {
     console.error("Error creating number:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 module.exports = { getNumbers, createNumber };
