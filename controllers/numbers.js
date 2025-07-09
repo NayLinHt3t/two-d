@@ -85,5 +85,27 @@ const createNumber = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+const getNumbersForAdmin = async (req, res) => {
+  try {
+    const nowYangon = moment().tz("Asia/Yangon");
 
-module.exports = { getNumbers, createNumber };
+    const todayYangon = nowYangon.clone().startOf("day");
+    const endOfTodayYangon = todayYangon.clone().endOf("day");
+    const tenDaysAgoYangon = todayYangon.clone().subtract(9, "days");
+
+    // Fetch numbers from the last 10 days (including today), no timeSlot filtering
+    const numbers = await Number.find({
+      date: {
+        $gte: tenDaysAgoYangon.toDate(),
+        $lte: endOfTodayYangon.toDate(),
+      },
+    }).sort({ date: 1, timeSlot: 1 });
+
+    res.json(numbers);
+  } catch (error) {
+    console.error("Error fetching numbers (admin):", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+module.exports = { getNumbers, createNumber, getNumbersForAdmin };
