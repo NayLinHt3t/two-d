@@ -6,14 +6,11 @@ const getNumbers = async (req, res) => {
     // Get current time in Asia/Yangon
     const nowYangon = moment().tz("Asia/Yangon");
 
-    const currentMinutes = (nowYangon.hours() / 12) * 60 + nowYangon.minutes();
-
+    const currentMinutes = (nowYangon.hours() - 12) * 60 + nowYangon.minutes();
     // Today in Yangon (midnight)
     const todayYangon = nowYangon.clone().startOf("day");
-    console.log(todayYangon);
     // End of today (23:59:59 in Yangon)
     const endOfTodayYangon = todayYangon.clone().endOf("day");
-
     // 10 days ago (inclusive of today)
     const tenDaysAgoYangon = todayYangon.clone().subtract(9, "days");
 
@@ -30,6 +27,7 @@ const getNumbers = async (req, res) => {
       const [hourStr, minStr] = timeSlot.split(":");
       const h = parseInt(hourStr, 10);
       const m = parseInt(minStr, 10);
+
       return h * 60 + m;
     }
 
