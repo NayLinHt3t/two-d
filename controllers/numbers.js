@@ -6,11 +6,11 @@ const getNumbers = async (req, res) => {
     // Get current time in Asia/Yangon
     const nowYangon = moment().tz("Asia/Yangon");
 
-    const currentMinutes = nowYangon.hours() * 60 + nowYangon.minutes();
+    const currentMinutes = (nowYangon.hours() / 12) * 60 + nowYangon.minutes();
 
     // Today in Yangon (midnight)
     const todayYangon = nowYangon.clone().startOf("day");
-
+    console.log(todayYangon);
     // End of today (23:59:59 in Yangon)
     const endOfTodayYangon = todayYangon.clone().endOf("day");
 
@@ -36,6 +36,7 @@ const getNumbers = async (req, res) => {
     // Filter numbers for past days and today's passed slots
     const filtered = numbers.filter((number) => {
       const numberDate = moment(number.date).tz("Asia/Yangon").startOf("day");
+
       if (numberDate.isBefore(todayYangon)) {
         return true;
       } else {
@@ -45,7 +46,6 @@ const getNumbers = async (req, res) => {
 
     res.json(filtered);
   } catch (error) {
-    console.error("Error fetching numbers:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
